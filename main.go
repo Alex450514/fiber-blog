@@ -2,6 +2,7 @@ package main
 
 import (
 	"log"
+	"sync"
 
 	"github.com/gofiber/fiber/v2"
 )
@@ -13,10 +14,13 @@ type Post struct {
 }
 
 // Mock Data
-var posts = []Post{
-	{ID: "1", Title: "First Post", Content: "Hello Fiber!"},
-	{ID: "2", Title: "Second Post", Content: "Fiber is fast 🚀"},
-}
+var (
+	posts = []Post{
+		{ID: "1", Title: "First Post", Content: "Hello Fiber!"},
+		{ID: "2", Title: "Second Post", Content: "Fiber is fast 🚀"},
+	}
+	postsMu sync.RWMutex
+)
 
 func main() {
 	app := fiber.New()
@@ -35,11 +39,15 @@ func main() {
 
 // Handlers
 func getPosts(c *fiber.Ctx) error {
+	postsMu.RLock()
+	defer postsMu.RUnlock()
 	return c.JSON(posts)
 }
 
 func getPostByID(c *fiber.Ctx) error {
 	id := c.Params("id")
+	postsMu.RLock()
+	defer postsMu.RUnlock()
 	for _, post := range posts {
 		if post.ID == id {
 			return c.JSON(post)
@@ -53,6 +61,8 @@ func createPost(c *fiber.Ctx) error {
 	if err := c.BodyParser(post); err != nil {
 		return c.Status(400).JSON(fiber.Map{"error": err.Error()})
 	}
+	postsMu.Lock()
 	posts = append(posts, *post)
+	postsMu.Unlock()
 	return c.Status(201).JSON(post)
 }
